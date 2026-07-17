@@ -1,0 +1,53 @@
+name: Build and Upload Artifacts
+
+on:
+  push:
+    branches:
+      - main # 每次推送代码到主分支时触发（可按需修改或删减）
+  pull_request:
+    branches:
+      - main # PR 时也自动编译测试
+  workflow_dispatch: # 开启这个选项，允许在 GitHub 网页上手动点击按钮触发
+
+jobs:
+  build:
+    name: Build for ${{ matrix.artifact_name }}
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: cli
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux (x86_64)
+          - os: ubuntu-latest
+            binary_path: target/release/bidiff
+            artifact_name: bidiff-linux
+          # macOS Apple Silicon
+          - os: macos-latest
+            binary_path: target/release/bidiff
+            artifact_name: bidiff-macos
+          # Windows (x86_64)
+          - os: windows-latest
+            binary_path: target/release/bidiff.exe
+            artifact_name: bidiff-windows
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run cargo build (Release)
+        run: cargo build --release
+        env:
+          RUSTFLAGS: -C opt-level=3 -C strip=symbols -C panic=abort -C codegen-units=1
+
+      # 将编译出来的二进制，作为工作流附件（Artifact）上传
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }} # 网页上显示的附件文件夹名称
+          path: ${{ matrix.binary_path }}     # 实际要上传的二进制文件路径
